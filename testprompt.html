@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desafío: Prompts Súper-Claros (Quiz)</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .question-card {
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s;
+        }
+        .option-label {
+            transition: all 0.1s;
+            cursor: pointer;
+        }
+        .option-label:hover {
+            background-color: #f3f4f6;
+        }
+        /* Estilos de botones de feedback */
+        .feedback-correct { background-color: #10b981; color: white; } /* Emerald */
+        .feedback-incorrect { background-color: #ef4444; color: white; } /* Red */
+        .feedback-option-correct { background-color: #d1fae5; border-color: #10b981; }
+        .feedback-option-incorrect { background-color: #fee2e2; border-color: #ef4444; }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-3xl mx-auto">
+        <!-- Encabezado y Título -->
+        <header class="text-center py-6 mb-8 bg-indigo-600 text-white rounded-xl shadow-lg">
+            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">
+                🧠 Desafío: Prompt Súper-Claro
+            </h1>
+            <p class="mt-2 text-indigo-200 text-lg">Pon a prueba tu dominio del *prompting* educativo.</p>
+        </header>
+
+        <!-- Marcador de Puntuación -->
+        <div class="flex justify-between items-center mb-6 p-4 bg-white rounded-xl shadow-md">
+            <p class="text-lg font-semibold text-gray-700">Puntuación: <span id="score" class="text-indigo-600 font-extrabold">0</span> / 15</p>
+            <p class="text-lg font-semibold text-gray-700">Pregunta: <span id="current-question-number" class="text-indigo-600 font-extrabold">1</span> / 15</p>
+        </div>
+
+        <!-- Contenedor del Quiz -->
+        <div id="quiz-container">
+            <!-- Las preguntas se cargarán aquí -->
+        </div>
+
+        <!-- Botones de Navegación -->
+        <div id="quiz-controls" class="flex justify-between mt-6">
+            <button id="prev-btn" onclick="goToQuestion(currentQuestionIndex - 1)" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md disabled:opacity-50" disabled>
+                &larr; Anterior
+            </button>
+            <button id="next-btn" onclick="goToQuestion(currentQuestionIndex + 1)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-lg">
+                Siguiente &rarr;
+            </button>
+        </div>
+        
+        <!-- Pantalla de Resultados (Inicialmente oculta) -->
+        <div id="results-screen" class="question-card p-8 text-center hidden">
+            <h2 class="text-3xl font-bold mb-4 text-indigo-700">🎉 ¡Resultados del Desafío!</h2>
+            <div class="mb-6">
+                <p class="text-xl text-gray-700">Has respondido correctamente a:</p>
+                <p id="final-score" class="text-6xl font-extrabold text-indigo-600 my-4"></p>
+                <p id="result-message" class="text-2xl font-semibold"></p>
+            </div>
+            <button onclick="startQuiz()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-8 rounded-lg transition duration-200 shadow-lg">
+                Repetir Prueba
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Array de preguntas y respuestas basado en las fuentes adjuntas
+        const quizData = [
+            {
+                question: "¿Cuál es la 'Regla de Oro' para un buen prompt, según la Guía Maestra?",
+                options: [
+                    { text: "Debe ser largo, técnico y muy formal.", isCorrect: false, rationale: "La Guía promueve un lenguaje claro y específico, no necesariamente largo o formal, para ser efectivo." },
+                    { text: "Debe ser claro, tener un objetivo y ayudarte a entender mejor.", isCorrect: true, rationale: "Esta es la definición central de un prompt efectivo y responsable, enfocada en el aprendizaje activo." },
+                    { text: "Debe incluir al menos dos verbos de acción y una analogía.", isCorrect: false, rationale: "El uso de verbos de acción es una técnica, pero no la 'Regla de Oro' que abarca la finalidad educativa del prompt." },
+                    { text: "Debe ser copiado y pegado de una lista de prompts predefinidos.", isCorrect: false, rationale: "La Guía desaconseja el copiado irresponsable, enfocándose en la habilidad de formular la pregunta correctamente." }
+                ],
+                hint: "Recuerda que el objetivo principal es tu aprendizaje y comprensión."
+            },
+            {
+                question: "En la 'Anatomía de un Prompt Excelente', ¿qué ingrediente se refiere a usar verbos como 'Crea', 'Resume' o 'Analiza'?",
+                options: [
+                    { text: "¿Para quién es? (La Audiencia)", isCorrect: false, rationale: "La audiencia define el nivel de complejidad del lenguaje que debe usar la IA (ej., 'como para un alumno de bachillerato')." },
+                    { text: "¿Cómo lo quieres? (El Formato y Estilo)", isCorrect: false, rationale: "El formato y estilo especifica si se necesita una tabla, una lista o una explicación sencilla." },
+                    { text: "¿Qué quieres? (La Acción)", isCorrect: true, rationale: "La Acción es el corazón de la instrucción y se logra usando verbos potentes que le dicen a la IA exactamente qué debe hacer." },
+                    { text: "¿Para qué lo quieres? (El Objetivo)", isCorrect: false, rationale: "El objetivo final (ej., 'para una presentación') proporciona el contexto para la respuesta." }
+                ],
+                hint: "Este ingrediente es el 'corazón' de la instrucción y le dice a la IA la tarea específica a realizar."
+            },
+            {
+                question: "Si pides a la IA que te explique un tema 'usando un ejemplo de la vida diaria', ¿qué técnica clave de aprendizaje estás aplicando?",
+                options: [
+                    { text: "El Principio de Pareto (80/20).", isCorrect: false, rationale: "El Principio de Pareto se usa para identificar el 20% del contenido más importante para estudiar." },
+                    { text: "La Analogía o Metáfora.", isCorrect: true, rationale: "Usar un ejemplo de la vida diaria es una forma de crear una analogía, conectando ideas abstractas con la realidad del estudiante para anclar el conocimiento." },
+                    { text: "La Estructura de un Buen Prompt.", isCorrect: false, rationale: "La estructura es el marco de la pregunta, no la técnica específica de explicación utilizada por la IA." },
+                    { text: "El Prompt en Cadena.", isCorrect: false, rationale: "El prompt en cadena implica dividir una tarea compleja en pasos secuenciales." }
+                ],
+                hint: "Piensa en cómo se llama la herramienta que conecta una idea abstracta con algo que ya conoces."
+            },
+            {
+                question: "¿Cuál de los siguientes prompts busca aplicar la técnica de **Análisis y Opinión** en Ciencias Sociales?",
+                options: [
+                    { text: "Haz una línea del tiempo sencilla sobre la Revolución Francesa.", isCorrect: false, rationale: "Este prompt está enfocado en la organización y el resumen de información histórica, no en el análisis crítico." },
+                    { text: "Ayúdame a resolver este problema paso a paso y explícamelo.", isCorrect: false, rationale: "Este prompt es para la categoría de Problemas y Ejercicios, comúnmente en Matemáticas o Ciencias." },
+                    { text: "Dame argumentos a favor y en contra de un tema polémico.", isCorrect: true, rationale: "Este prompt fomenta el pensamiento crítico al obligar al estudiante a analizar un tema desde múltiples perspectivas, esencial en Ciencias Sociales." },
+                    { text: "Resume el tema en 5 ideas clave.", isCorrect: false, rationale: "Este prompt está enfocado en la síntesis y el repaso, no en la formación de una opinión propia." }
+                ],
+                hint: "Busca la opción que te obliga a reflexionar sobre un tema desde diferentes perspectivas."
+            },
+            {
+                question: "En la estructura de un prompt, si le pides a la IA que 'actúe como un profesor de historia', ¿a qué ingrediente clave corresponde esta instrucción?",
+                options: [
+                    { text: "¿Qué quieres? (La Acción)", isCorrect: false, rationale: "La acción es el verbo principal (ej., Explícame), no el rol." },
+                    { text: "¿Para quién es? (La Audiencia)", isCorrect: true, rationale: "Definir un rol (profesor) o una audiencia (alumno de 14 años) asegura que la IA ajuste el tono, la complejidad y los ejemplos utilizados." },
+                    { text: "¿Cómo lo quieres? (El Formato)", isCorrect: false, rationale: "El formato se refiere a la presentación (ej., tabla, viñetas)." },
+                    { text: "¿Para qué lo quieres? (El Objetivo)", isCorrect: false, rationale: "El objetivo es la finalidad de la tarea (ej., para una exposición)." }
+                ],
+                hint: "El rol o la persona a la que se dirige la respuesta determina el nivel y el lenguaje de la explicación."
+            },
+            {
+                question: "Para 'acelerar el aprendizaje' usando la técnica del Principio de Pareto (80/20), ¿qué busca el estudiante?",
+                options: [
+                    { text: "Que la IA escriba la tarea completa para ahorrar tiempo.", isCorrect: false, rationale: "Esto va en contra de la 'Regla de Oro' de usar la IA para aprender, no para copiar." },
+                    { text: "Identificar y compartir el 20% de aprendizaje más importante para comprender el 80% del tema.", isCorrect: true, rationale: "El Principio de Pareto se aplica para priorizar el estudio en los conceptos de mayor impacto, maximizando la comprensión con el menor esfuerzo." },
+                    { text: "Generar una lista de 10 preguntas de autoevaluación al azar.", isCorrect: false, rationale: "Esto es parte de la técnica de autoevaluación, no específicamente del Principio de Pareto." },
+                    { text: "Que la IA corrija todos los errores gramaticales de su texto.", isCorrect: false, rationale: "Esto corresponde a la categoría de Prompts para Redacción y Exposición." }
+                ],
+                hint: "Recuerda que el 80/20 se enfoca en la eficiencia y la priorización de contenidos."
+            },
+            {
+                question: "Si la IA te da una respuesta muy técnica sobre un tema, ¿cuál es la mejor **pregunta de seguimiento** para refinarla y hacerla más clara?",
+                options: [
+                    { text: "Gracias, ahora dame otra respuesta diferente.", isCorrect: false, rationale: "Esto podría no solucionar el problema de complejidad; es mejor ser específico sobre el cambio deseado." },
+                    { text: "Ajústala y explícamela de nuevo como si tuviera 14 años.", isCorrect: true, rationale: "Esta técnica usa el 'Ajuste del Nivel de Complejidad' para refinar la respuesta, asegurando que el lenguaje y los ejemplos sean apropiados para un estudiante de bachillerato." },
+                    { text: "Convierte esto en una tabla comparativa con 5 filas.", isCorrect: false, rationale: "Esto cambia el formato, pero no necesariamente la complejidad o el lenguaje técnico." },
+                    { text: "Dime el origen de toda esta información.", isCorrect: false, rationale: "Esto se enfoca en la fuente, no en la comprensión del contenido." }
+                ],
+                hint: "Debes especificarle a la IA el cambio que necesitas, en este caso, en el nivel de dificultad."
+            },
+            {
+                question: "¿Cuál de las siguientes acciones NO se recomienda según la Guía para un uso ético y responsable de la IA?",
+                options: [
+                    { text: "Usarla para crear esquemas o mapas conceptuales para estudiar.", isCorrect: false, rationale: "La Guía aprueba el uso de la IA para generar esquemas y organizar ideas, ya que fomenta la comprensión." },
+                    { text: "Pedirle que genere ideas para tu ensayo antes de escribirlo.", isCorrect: false, rationale: "La generación de ideas es un uso ético que ayuda a superar el bloqueo del escritor." },
+                    { text: "Copiar y pegar la respuesta directamente en tu trabajo sin entenderla.", isCorrect: true, rationale: "Esta es la acción que la Guía explícitamente prohíbe, ya que obstaculiza el verdadero proceso de aprendizaje." },
+                    { text: "Pedirle que revise un borrador de texto que tú escribiste.", isCorrect: false, rationale: "Revisar borradores para mejorar la redacción es una forma ética de usar la IA como editor y tutor." }
+                ],
+                hint: "Recuerda que el verdadero aprendizaje ocurre cuando procesas la información, no cuando te saltas el proceso."
+            },
+            {
+                question: "Si un estudiante usa el prompt: 'Ayúdame a hacer un esquema o mapa conceptual sobre [tema]', ¿a qué categoría de Prompts básicos pertenece?",
+                options: [
+                    { text: "Prompts para Redacción y Exposiciones.", isCorrect: false, rationale: "Esta categoría se centra en mejorar textos, corregir gramática o crear introducciones." },
+                    { text: "Prompts para Tareas.", isCorrect: false, rationale: "Los prompts para tareas buscan explicaciones sencillas o desgloses paso a paso de conceptos." },
+                    { text: "Prompts para Investigaciones.", isCorrect: true, rationale: "Hacer esquemas o mapas conceptuales es una herramienta fundamental para organizar la información de forma visual y jerárquica durante un proyecto de investigación." },
+                    { text: "Prompts para Problemas y Ejercicios.", isCorrect: false, rationale: "Esta categoría está diseñada para resolver problemas matemáticos o ejercicios paso a paso." }
+                ],
+                hint: "Piensa en el momento del proyecto escolar en el que necesitas organizar grandes volúmenes de información."
+            },
+            {
+                question: "¿Cuál de estos verbos de acción es el más adecuado para iniciar un prompt cuando buscas obtener una explicación sencilla de un concepto difícil?",
+                options: [
+                    { text: "Diseña.", isCorrect: false, rationale: "El verbo 'Diseña' se utiliza más para crear estructuras o planes, como un plan de artículo." },
+                    { text: "Sugiere.", isCorrect: false, rationale: "El verbo 'Sugiere' se usa para pedir ideas o preguntas de investigación, no para obtener una explicación directa." },
+                    { text: "Compara.", isCorrect: false, rationale: "El verbo 'Compara' se enfoca en encontrar similitudes y diferencias entre dos o más elementos." },
+                    { text: "Explica.", isCorrect: true, rationale: "El verbo 'Explica' es el más directo y claro para pedir a la IA que desarrolle o aclare un tema, especialmente si se acompaña de la instrucción de audiencia ('como para un alumno de bachillerato')." }
+                ],
+                hint: "Busca el verbo que significa 'dar claridad' o 'detallar'."
+            },
+            {
+                question: "En la estructura de los '4 Ingredientes Clave', si le pides a la IA que te entregue la respuesta 'en una tabla comparativa', ¿qué ingrediente estás especificando?",
+                options: [
+                    { text: "La Acción.", isCorrect: false, rationale: "La acción es el verbo principal que indica la tarea a realizar." },
+                    { text: "El Formato y Estilo.", isCorrect: true, rationale: "El formato especifica la presentación de la respuesta (tabla, lista, viñetas, extensión), asegurando que el resultado sea directamente útil para la tarea." },
+                    { text: "El Objetivo.", isCorrect: false, rationale: "El objetivo es el fin de la solicitud (ej., para entender las diferencias)." },
+                    { text: "La Audiencia.", isCorrect: false, rationale: "La audiencia define el nivel de lenguaje y complejidad." }
+                ],
+                hint: "Esto se refiere a la forma en que el contenido es presentado."
+            },
+            {
+                question: "Según la Guía, pedir 'argumentos a favor y en contra' de un tema ayuda a desarrollar:",
+                options: [
+                    { text: "La memorización de fechas y hechos.", isCorrect: false, rationale: "La memorización se fomenta con resúmenes o historias, no con argumentos." },
+                    { text: "La habilidad para copiar y pegar textos más largos.", isCorrect: false, rationale: "Esto contraviene el uso ético y responsable de la IA." },
+                    { text: "El pensamiento crítico y una comprensión matizada del tema.", isCorrect: true, rationale: "Analizar múltiples perspectivas es la definición de pensamiento crítico, esencial para las Ciencias Sociales." },
+                    { text: "El dominio de los prompts para Redacción.", isCorrect: false, rationale: "Esto es una técnica de análisis de contenido, no de redacción de un texto." }
+                ],
+                hint: "Piensa en la habilidad más importante que se fomenta al debatir y analizar diferentes puntos de vista."
+            },
+            {
+                question: "El prompt 'Hazme 5 preguntas para comprobar si entendí' corresponde a la categoría de:",
+                options: [
+                    { text: "Prompts para Redacción y Exposiciones.", isCorrect: false, rationale: "Esta categoría se enfoca en pulir o estructurar textos y presentaciones." },
+                    { text: "Prompts para Investigaciones.", isCorrect: false, rationale: "Esta categoría se centra en la organización de información o en la sugerencia de preguntas de investigación." },
+                    { text: "Prompts para Estudiar y Repasar.", isCorrect: true, rationale: "Esta técnica fomenta el aprendizaje activo y la autoevaluación, considerada una de las técnicas de estudio más efectivas." },
+                    { text: "Prompts para Tareas.", isCorrect: false, rationale: "Esta categoría se enfoca en la comprensión inicial del tema o concepto." }
+                ],
+                hint: "Esta técnica te ayuda a saber si estás listo para un examen."
+            },
+            {
+                question: "El prompt 'Dame un ejemplo de una situación ética y cómo se puede resolver' está clasificado bajo la categoría:",
+                options: [
+                    { text: "Prompts para Historia.", isCorrect: false, rationale: "Esta categoría se enfoca en el análisis de causas, consecuencias y líneas del tiempo." },
+                    { text: "Prompts para Geografía.", isCorrect: false, rationale: "Esta categoría trata sobre características geográficas y la relación entre clima y actividades humanas." },
+                    { text: "Prompts para Formación Cívica y Ética.", isCorrect: true, rationale: "Este prompt busca aplicar conceptos de derechos, obligaciones, valores y resolución de dilemas éticos, que son el centro de esta materia." },
+                    { text: "Prompts para Sociedad y Cultura.", isCorrect: false, rationale: "Esta categoría se enfoca en problemas sociales y su afectación a la comunidad." }
+                ],
+                hint: "El prompt hace referencia directa a un dilema moral o social y su resolución."
+            },
+            {
+                question: "Según la Guía, el verdadero desafío de la IA no es usarla, sino convertirse en el tipo de persona que:",
+                options: [
+                    { text: "Sabe buscar información en fuentes confiables para verificar la respuesta.", isCorrect: false, rationale: "Esto es una práctica recomendada, pero no el 'verdadero desafío' intelectual." },
+                    { text: "Sabe qué preguntas hacer.", isCorrect: true, rationale: "Dominar el 'prompting' es el verdadero superpoder; es aprender a dirigir la herramienta para obtener nuevo conocimiento y pensar estratégicamente." },
+                    { text: "Sabe copiar y pegar el texto en un documento Word.", isCorrect: false, rationale: "Esto va en contra de la ética y la responsabilidad del estudiante." },
+                    { text: "Sabe crear una tabla comparativa o un esquema.", isCorrect: false, rationale: "Estas son habilidades de formato, no el desafío intelectual central del prompting." }
+                ],
+                hint: "El poder no está en la respuesta, sino en el proceso de formulación de la solicitud."
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let userAnswers = {}; // Para guardar las respuestas seleccionadas por el usuario
+
+        function getCorrectOptionIndex(question) {
+            return question.options.findIndex(option => option.isCorrect);
+        }
+
+        // Función principal para iniciar o reiniciar el quiz
+        function startQuiz() {
+            currentQuestionIndex = 0;
+            score = 0;
+            userAnswers = {};
+            document.getElementById('results-screen').classList.add('hidden');
+            document.getElementById('quiz-container').classList.remove('hidden');
+            document.getElementById('quiz-controls').classList.remove('hidden');
+            document.getElementById('score').textContent = score;
+            goToQuestion(0);
+        }
+
+        // Función para cambiar de pregunta
+        function goToQuestion(index) {
+            if (index >= 0 && index < quizData.length) {
+                currentQuestionIndex = index;
+                renderQuestion(quizData[index], index);
+                updateControls(index);
+                document.getElementById('current-question-number').textContent = index + 1;
+            } else if (index === quizData.length) {
+                showResults();
+            }
+        }
+
+        // Función para renderizar una pregunta
+        function renderQuestion(questionData, index) {
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = '';
+            
+            const questionCard = document.createElement('div');
+            questionCard.className = 'question-card p-6 mb-6';
+            
+            // Título de la pregunta y el hint
+            questionCard.innerHTML = `
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Pregunta ${index + 1}:</h3>
+                <p class="text-lg text-gray-700 mb-6">${questionData.question}</p>
+                <div id="options-${index}" class="space-y-3">
+                    <!-- Opciones de respuesta van aquí -->
+                </div>
+                <div class="mt-4 p-3 border-l-4 border-indigo-400 bg-indigo-50 text-indigo-800 text-sm rounded-md">
+                    **Pista:** ${questionData.hint}
+                </div>
+                <div id="feedback-${index}" class="mt-4 p-4 rounded-lg hidden"></div>
+            `;
+            container.appendChild(questionCard);
+
+            const optionsContainer = document.getElementById(`options-${index}`);
+            const feedbackDiv = document.getElementById(`feedback-${index}`);
+
+            questionData.options.forEach((option, optIndex) => {
+                const isChecked = userAnswers[index] === optIndex;
+                const optionId = `q${index}-opt${optIndex}`;
+                
+                const label = document.createElement('label');
+                label.className = `option-label block p-3 border rounded-lg ${isChecked ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'}`;
+                label.setAttribute('for', optionId);
+                
+                label.innerHTML = `
+                    <input type="radio" id="${optionId}" name="question-${index}" value="${optIndex}" class="mr-3" ${isChecked ? 'checked' : ''} 
+                           onclick="handleAnswerSelection(${index}, ${optIndex})">
+                    ${option.text}
+                `;
+                optionsContainer.appendChild(label);
+
+                // Si ya respondió, mostramos el feedback al volver
+                if (isChecked && userAnswers[index] !== undefined) {
+                    showFeedback(index, optionsContainer, feedbackDiv);
+                }
+            });
+        }
+
+        // Manejar la selección de respuesta
+        function handleAnswerSelection(qIndex, selectedOptIndex) {
+            const questionData = quizData[qIndex];
+            const correctOptIndex = getCorrectOptionIndex(questionData);
+            
+            // 1. Guardar la respuesta seleccionada
+            userAnswers[qIndex] = selectedOptIndex;
+
+            // 2. Recalcular y actualizar la puntuación
+            calculateScore();
+            document.getElementById('score').textContent = score;
+
+            // 3. Mostrar feedback inmediato
+            const optionsContainer = document.getElementById(`options-${qIndex}`);
+            const feedbackDiv = document.getElementById(`feedback-${qIndex}`);
+            showFeedback(qIndex, optionsContainer, feedbackDiv);
+        }
+
+        // Función para mostrar el feedback (racional y colores)
+        function showFeedback(qIndex, optionsContainer, feedbackDiv) {
+            const questionData = quizData[qIndex];
+            const correctOptIndex = getCorrectOptionIndex(questionData);
+            const selectedOptIndex = userAnswers[qIndex];
+
+            // 1. Aplicar colores a las opciones
+            optionsContainer.querySelectorAll('label').forEach((label, optIndex) => {
+                label.classList.remove('feedback-option-correct', 'feedback-option-incorrect', 'border-indigo-500', 'bg-indigo-50');
+                
+                if (optIndex === correctOptIndex) {
+                    label.classList.add('feedback-option-correct');
+                } else if (optIndex === selectedOptIndex) {
+                    label.classList.add('feedback-option-incorrect');
+                }
+            });
+
+            // 2. Mostrar la racional en el div de feedback
+            const isCorrect = selectedOptIndex === correctOptIndex;
+            const rationale = questionData.options[selectedOptIndex].rationale;
+            
+            feedbackDiv.classList.remove('hidden', 'feedback-correct', 'feedback-incorrect');
+            feedbackDiv.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
+            
+            feedbackDiv.innerHTML = isCorrect ? 
+                `✅ **¡Correcto!** Racional: ${rationale}` : 
+                `❌ **Incorrecto.** Racional: ${rationale}`;
+        }
+
+        // Actualizar el estado de los botones (Anterior/Siguiente)
+        function updateControls(index) {
+            document.getElementById('prev-btn').disabled = index === 0;
+            
+            if (index === quizData.length - 1) {
+                document.getElementById('next-btn').textContent = "Finalizar Prueba";
+            } else {
+                document.getElementById('next-btn').textContent = "Siguiente →";
+            }
+        }
+
+        // Calcular la puntuación total
+        function calculateScore() {
+            score = 0;
+            quizData.forEach((q, index) => {
+                const correctOptIndex = getCorrectOptionIndex(q);
+                if (userAnswers[index] !== undefined && userAnswers[index] === correctOptIndex) {
+                    score++;
+                }
+            });
+        }
+
+        // Mostrar la pantalla de resultados
+        function showResults() {
+            calculateScore();
+            const totalQuestions = quizData.length;
+            const percentage = (score / totalQuestions) * 100;
+            
+            document.getElementById('quiz-container').classList.add('hidden');
+            document.getElementById('quiz-controls').classList.add('hidden');
+            document.getElementById('results-screen').classList.remove('hidden');
+
+            document.getElementById('final-score').textContent = `${score} / ${totalQuestions}`;
+            
+            const messageDiv = document.getElementById('result-message');
+            messageDiv.classList.remove('text-green-600', 'text-red-600');
+            
+            if (percentage >= 80) {
+                messageDiv.textContent = `¡Felicidades! Has completado el desafío con éxito. ¡Eres un maestro de los Prompts Súper-Claros!`;
+                messageDiv.classList.add('text-green-600');
+            } else {
+                messageDiv.textContent = `¡Buen intento! Necesitas el 80% para superar el desafío. Sigue practicando y repasa la Guía Maestra.`;
+                messageDiv.classList.add('text-red-600');
+            }
+        }
+
+        // Inicializar el quiz al cargar la página
+        document.addEventListener('DOMContentLoaded', startQuiz);
+
+    </script>
+</body>
+</html>
